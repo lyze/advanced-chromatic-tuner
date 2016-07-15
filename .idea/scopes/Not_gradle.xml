@@ -1,0 +1,3 @@
+<component name="DependencyValidationManager">
+  <scope name="Not gradle" pattern="!file[ChromaticTuner]:gradle.properties&amp;&amp;!file[ChromaticTuner]:gradlew&amp;&amp;!file[ChromaticTuner]:gradle/wrapper/gradle-wrapper.properties&amp;&amp;!file[ChromaticTuner]:settings.gradle&amp;&amp;!file[app]:build.gradle&amp;&amp;!file[ChromaticTuner]:build.gradle" />
+</component>
