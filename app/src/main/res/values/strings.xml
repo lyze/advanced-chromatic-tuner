@@ -23,4 +23,7 @@
     <string name="hello_world">Hello world!</string>
 
     <string name="action_settings">Settings</string>
+
+    <string name="permission_record_audio_rationale">Permission to record audio is needed to analyze musical pitch.</string>
+    <string name="ok">OK</string>
 </resources>
