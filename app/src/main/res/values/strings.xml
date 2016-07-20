@@ -26,4 +26,6 @@
 
     <string name="permission_record_audio_rationale">Permission to record audio is needed to analyze musical pitch.</string>
     <string name="ok">OK</string>
+    <string name="graph_no_data">No audio data available.</string>
+    <string name="graph_description_frequency">Frequency spectrum</string>
 </resources>

@@ -17,4 +17,8 @@
     <color name="material_blue_500">#2196F3</color>
     <color name="material_blue_700">#1976D2</color>
     <color name="material_green_A200">#A5D6A7</color>
+
+    <color name="app_primary_dark">@color/material_blue_700</color>
+    <color name="app_primary">@color/material_blue_500</color>
+    <color name="app_accent">@color/material_green_A200</color>
 </resources>

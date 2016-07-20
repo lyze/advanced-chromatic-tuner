@@ -17,7 +17,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.crcrch.chromatictuner.app.SimpleTuningFragment">
+    tools:context="com.crcrch.chromatictuner.app.SimpleTuningFragment"
+    android:orientation="vertical">
 
     <TextView
         android:layout_width="wrap_content"

@@ -18,9 +18,9 @@
     <style name="Theme.AppTheme" parent="Theme.BaseAppTheme"/>
 
     <style name="Theme.BaseAppTheme" parent="Theme.AppCompat.Light">
-        <item name="colorPrimary">@color/material_blue_500</item>
-        <item name="colorPrimaryDark">@color/material_blue_700</item>
-        <item name="colorAccent">@color/material_green_A200</item>
+        <item name="colorPrimary">@color/app_primary</item>
+        <item name="colorPrimaryDark">@color/app_primary_dark</item>
+        <item name="colorAccent">@color/app_accent</item>
     </style>
 
 </resources>

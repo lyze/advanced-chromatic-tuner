@@ -16,6 +16,7 @@
 package com.crcrch.chromatictuner.app;
 
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.design.widget.TabLayout;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
@@ -25,26 +26,35 @@ import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.*;
+import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity
         implements AudioAnalyzerFragment.OnSpectrumCalculatedListener {
 
     private static final String TAG = "MainActivity";
+    private LineChart graph;
+    private LineData graphData;
+    private float[] frequencySpectrum;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        PagerAdapter pagerAdapter = new SectionsPagerAdapter(getSupportFragmentManager());
-        ViewPager viewPager = (ViewPager) findViewById(R.id.pager);
-        viewPager.setAdapter(pagerAdapter);
+//        PagerAdapter pagerAdapter = new SectionsPagerAdapter(getSupportFragmentManager());
+//        ViewPager viewPager = (ViewPager) findViewById(R.id.pager);
+//        viewPager.setAdapter(pagerAdapter);
 
-        TabLayout tabLayout = (TabLayout) findViewById(R.id.tab_layout);
-        tabLayout.setupWithViewPager(viewPager);
+//        TabLayout tabLayout = (TabLayout) findViewById(R.id.tab_layout);
+//        tabLayout.setupWithViewPager(viewPager);
 
         FragmentManager fm = getSupportFragmentManager();
         AudioAnalyzerFragment analyzerFragment =
@@ -53,12 +63,38 @@ public class MainActivity extends AppCompatActivity
             analyzerFragment = AudioAnalyzerFragment.newInstance();
             fm.beginTransaction().add(analyzerFragment, "analyzer").commit();
         }
+
+        graph = (LineChart) findViewById(R.id.graph);
+        graph.setNoDataTextDescription(getString(R.string.graph_no_data));
+        graph.setDescription(getString(R.string.graph_description_frequency));
+        graph.setPinchZoom(true);
     }
 
     @Override
-    public void onSpectrumCalculated(float[] spectrum) {
-        // TODO
-        Log.v(TAG, "spectrum = " + Arrays.toString(spectrum));
+    public void onFrequencySpectrumCalculated(@NonNull float[] frequencySpectrum) {
+        if (graphData == null || this.frequencySpectrum != frequencySpectrum) {
+            this.frequencySpectrum = frequencySpectrum;
+            List<Entry> realParts = new ArrayList<>(frequencySpectrum.length / 2);
+            List<Entry> imagParts = new ArrayList<>(frequencySpectrum.length / 2);
+            for (int i = 0; i < frequencySpectrum.length / 2; i++) {
+                realParts.add(new FloatArrayBackedEntry(frequencySpectrum, 2 * i));
+                imagParts.add(new FloatArrayBackedEntry(frequencySpectrum, 2 * i + 1));
+            }
+            LineDataSet realData = new LineDataSet(realParts, "real");
+            realData.setCircleRadius(realData.getLineWidth() / 2);
+            realData.setCircleColor(R.color.app_primary);
+            realData.setColor(R.color.app_primary);
+
+            LineDataSet imagData = new LineDataSet(imagParts, "imaginary");
+            imagData.setCircleRadius(imagData.getLineWidth() / 2);
+            imagData.setCircleColor(R.color.app_accent);
+            imagData.setCircleColor(R.color.app_accent);
+
+            graphData = new LineData(realData, imagData);
+            graph.setData(graphData);
+        } else {
+            graphData.notifyDataChanged();
+        }
     }
 
     @Override

@@ -160,7 +160,11 @@ public class AudioAnalyzerFragment extends Fragment {
     }
 
     public interface OnSpectrumCalculatedListener {
-        void onSpectrumCalculated(float[] spectrum);
+        /**
+         * Called when a new frequency spectrum is computed.
+         * @param frequencySpectrum the frequency frequencySpectrum
+         */
+        void onFrequencySpectrumCalculated(@NonNull float[] frequencySpectrum);
     }
 
     private class AudioAnalyzer extends AsyncTask<Void, float[], Void> {
@@ -206,7 +210,7 @@ public class AudioAnalyzerFragment extends Fragment {
 
         @Override
         protected void onProgressUpdate(float[]... values) {
-            callback.onSpectrumCalculated(values[0]);
+            callback.onFrequencySpectrumCalculated(values[0]);
         }
     }
 
