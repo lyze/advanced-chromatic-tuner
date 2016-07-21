@@ -21,11 +21,11 @@ import com.github.mikephil.charting.data.Entry;
 /**
  * Compatibility for MPAndroidChart.
  */
-public class FloatArrayBackedEntry extends Entry {
+public class FloatArrayEntry extends Entry {
     private final float[] array;
-    private final int index;
+    protected final int index;
 
-    public FloatArrayBackedEntry(float[] array, int index) {
+    public FloatArrayEntry(float[] array, int index) {
         this.array = array;
         this.index = index;
     }

@@ -15,86 +15,48 @@
 
 package com.crcrch.chromatictuner.app;
 
+import android.Manifest;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
+import android.media.MediaRecorder;
+import android.os.Build;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
-import android.support.design.widget.TabLayout;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentPagerAdapter;
-import android.support.v4.view.PagerAdapter;
-import android.support.v4.view.ViewPager;
+import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
-import android.view.*;
-import com.github.mikephil.charting.charts.LineChart;
-import com.github.mikephil.charting.data.Entry;
-import com.github.mikephil.charting.data.LineData;
-import com.github.mikephil.charting.data.LineDataSet;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import com.crcrch.chromatictuner.util.MyAsyncTask;
+import org.jtransforms.fft.FloatFFT_1D;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Locale;
-
-public class MainActivity extends AppCompatActivity
-        implements AudioAnalyzerFragment.OnSpectrumCalculatedListener {
-
+public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
-    private LineChart graph;
-    private LineData graphData;
-    private float[] frequencySpectrum;
+    private static final String USE_UNPROCESSED_AUDIO_SOURCE = "use unprocessed audio source";
+    private static final int MY_PERMISSIONS_REQUEST_RECORD_AUDIO = 17;
+    private AudioAnalyzer audioAnalyzer;
+    private PowerSpectrumFragment powerSpectrumFrag;
+
+    private static int getSampleRateToUse() {
+        if (Build.VERSION.SDK_INT >= 24) {
+            return AudioFormat.SAMPLE_RATE_UNSPECIFIED;
+        }
+        return 44100;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-//        PagerAdapter pagerAdapter = new SectionsPagerAdapter(getSupportFragmentManager());
-//        ViewPager viewPager = (ViewPager) findViewById(R.id.pager);
-//        viewPager.setAdapter(pagerAdapter);
-
-//        TabLayout tabLayout = (TabLayout) findViewById(R.id.tab_layout);
-//        tabLayout.setupWithViewPager(viewPager);
-
-        FragmentManager fm = getSupportFragmentManager();
-        AudioAnalyzerFragment analyzerFragment =
-                (AudioAnalyzerFragment) fm.findFragmentByTag("analyzer");
-        if (analyzerFragment == null) {
-            analyzerFragment = AudioAnalyzerFragment.newInstance();
-            fm.beginTransaction().add(analyzerFragment, "analyzer").commit();
-        }
-
-        graph = (LineChart) findViewById(R.id.graph);
-        graph.setNoDataTextDescription(getString(R.string.graph_no_data));
-        graph.setDescription(getString(R.string.graph_description_frequency));
-        graph.setPinchZoom(true);
-    }
-
-    @Override
-    public void onFrequencySpectrumCalculated(@NonNull float[] frequencySpectrum) {
-        if (graphData == null || this.frequencySpectrum != frequencySpectrum) {
-            this.frequencySpectrum = frequencySpectrum;
-            List<Entry> realParts = new ArrayList<>(frequencySpectrum.length / 2);
-            List<Entry> imagParts = new ArrayList<>(frequencySpectrum.length / 2);
-            for (int i = 0; i < frequencySpectrum.length / 2; i++) {
-                realParts.add(new FloatArrayBackedEntry(frequencySpectrum, 2 * i));
-                imagParts.add(new FloatArrayBackedEntry(frequencySpectrum, 2 * i + 1));
-            }
-            LineDataSet realData = new LineDataSet(realParts, "real");
-            realData.setCircleRadius(realData.getLineWidth() / 2);
-            realData.setCircleColor(R.color.app_primary);
-            realData.setColor(R.color.app_primary);
-
-            LineDataSet imagData = new LineDataSet(imagParts, "imaginary");
-            imagData.setCircleRadius(imagData.getLineWidth() / 2);
-            imagData.setCircleColor(R.color.app_accent);
-            imagData.setCircleColor(R.color.app_accent);
-
-            graphData = new LineData(realData, imagData);
-            graph.setData(graphData);
-        } else {
-            graphData.notifyDataChanged();
-        }
+        powerSpectrumFrag = (PowerSpectrumFragment) getSupportFragmentManager().findFragmentById(
+                R.id.power_spectrum);
     }
 
     @Override
@@ -105,83 +67,183 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
-    public static class RecorderFragment extends Fragment {
-    }
-
-    /**
-     * A placeholder fragment containing a simple view.
-     */
-    public static class PlaceholderFragment extends Fragment {
-        /**
-         * The fragment argument representing the section number for this
-         * fragment.
-         */
-        private static final String ARG_SECTION_NUMBER = "section_number";
-
-        public PlaceholderFragment() {
-        }
-
-        /**
-         * Returns a new instance of this fragment for the given section
-         * number.
-         */
-        public static PlaceholderFragment newInstance(int sectionNumber) {
-            PlaceholderFragment fragment = new PlaceholderFragment();
-            Bundle args = new Bundle();
-            args.putInt(ARG_SECTION_NUMBER, sectionNumber);
-            fragment.setArguments(args);
-            return fragment;
-        }
-
-        @Override
-        public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                                 Bundle savedInstanceState) {
-            return inflater.inflate(R.layout.fragment_main, container, false);
+        switch (item.getItemId()) {
+            case R.id.action_settings:
+                startActivity(new Intent(this, SettingsActivity.class));
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
         }
     }
 
-    /**
-     * A {@link FragmentPagerAdapter} that returns a fragment corresponding to
-     * one of the sections/tabs/pages.
-     */
-    private class SectionsPagerAdapter extends FragmentPagerAdapter {
+    @Override
+    public void onStart() {
+        super.onStart();
 
-        public SectionsPagerAdapter(FragmentManager fm) {
-            super(fm);
+        audioAnalyzer = new AudioAnalyzer();
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED) {
+            audioAnalyzer.execute();
+            return;
         }
-
-        @Override
-        public Fragment getItem(int position) {
-            return PlaceholderFragment.newInstance(position + 1);
+        if (ActivityCompat.shouldShowRequestPermissionRationale(this,
+                Manifest.permission.RECORD_AUDIO)) {
+            Snackbar.make(getWindow().getDecorView().getRootView(),
+                    R.string.permission_record_audio_rationale,
+                    Snackbar.LENGTH_INDEFINITE).setAction(R.string.ok, new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    ActivityCompat.requestPermissions(MainActivity.this,
+                            new String[] {Manifest.permission.RECORD_AUDIO},
+                            MY_PERMISSIONS_REQUEST_RECORD_AUDIO);
+                }
+            }).show();
+        } else {
+            ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.RECORD_AUDIO},
+                    MY_PERMISSIONS_REQUEST_RECORD_AUDIO);
         }
+    }
 
-        @Override
-        public int getCount() {
-            // Show 3 total pages.
-            return 3;
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        switch (requestCode) {
+            case MY_PERMISSIONS_REQUEST_RECORD_AUDIO:
+                if (grantResults.length > 0) {
+                    if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                        audioAnalyzer.execute();
+                    } else {
+                        powerSpectrumFrag.getGraph().setNoDataTextDescription(getString(
+                                R.string.graph_no_data_description_permission_denied));
+                        Log.e(TAG, "Record audio permission denied.");
+                    }
+                }
         }
+    }
 
-        @Override
-        public CharSequence getPageTitle(int position) {
-            Locale l = Locale.getDefault();
-            switch (position) {
-                case 0:
-                    return getString(R.string.title_section1).toUpperCase(l);
-                case 1:
-                    return getString(R.string.title_section2).toUpperCase(l);
-                case 2:
-                    return getString(R.string.title_section3).toUpperCase(l);
+    @Override
+    public void onStop() {
+        super.onStop();
+        if (audioAnalyzer != null) {
+            audioAnalyzer.cancel(true);
+            audioAnalyzer = null;
+        }
+    }
+
+    private int getAudioSourceToUse() {
+        int audioSource;
+        if (Build.VERSION.SDK_INT >= 24) {
+            SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
+            if (pref.getBoolean(USE_UNPROCESSED_AUDIO_SOURCE, false)) {
+                audioSource = MediaRecorder.AudioSource.UNPROCESSED;
+            } else {
+                audioSource = MediaRecorder.AudioSource.MIC;
             }
+        } else {
+            audioSource = MediaRecorder.AudioSource.MIC;
+        }
+        return audioSource;
+    }
+
+    private AudioRecord newAudioRecord(int encoding) {
+        if (Build.VERSION.SDK_INT >= 23) {
+            return new AudioRecord.Builder()
+                    .setAudioSource(getAudioSourceToUse())
+                    .setAudioFormat(new AudioFormat.Builder().setEncoding(encoding).build())
+                    .build();
+        }
+        return new AudioRecord(
+                getAudioSourceToUse(),
+                getSampleRateToUse(),
+                AudioFormat.CHANNEL_IN_DEFAULT,
+                encoding,
+                AudioRecord.getMinBufferSize(getSampleRateToUse(), AudioFormat.CHANNEL_IN_DEFAULT,
+                        encoding));
+    }
+
+    public void toggleLiveSpectrum(View view) {
+        audioAnalyzer.togglePaused();
+    }
+
+    /**
+     * Computes power and phase spectra. This class should only be used in the visible lifecycle
+     * of the app.
+     */
+    private class AudioAnalyzer extends MyAsyncTask<Void, Void, Void> {
+        private static final String TAG = "AudioAnalyzer";
+        private static final int UPDATES_PER_SECOND = 60;
+
+        @Override
+        protected Void doInBackground(Void... voids) {
+            Log.d(TAG, "Starting audio analysis...");
+            AudioRecord audioRecord;
+            if (Build.VERSION.SDK_INT >= 23) {
+                audioRecord = newAudioRecord(AudioFormat.ENCODING_PCM_FLOAT);
+            } else {
+                audioRecord = newAudioRecord(AudioFormat.ENCODING_PCM_16BIT);
+            }
+
+            int sampleRate = audioRecord.getSampleRate();
+            int sampleSize = (int) ((double) sampleRate / UPDATES_PER_SECOND);
+            FloatFFT_1D fft = new FloatFFT_1D(sampleSize);
+
+            float[] data = new float[2 * sampleSize];
+            short[] data16Bit;
+            if (Build.VERSION.SDK_INT >= 23) {
+                data16Bit = new short[0];
+            } else {
+                data16Bit = new short[sampleSize];
+            }
+
+            float[] powerSpectrum = new float[sampleSize];
+            float[] phaseSpectrum = new float[sampleSize];
+
+            powerSpectrumFrag.setPowerSpectrumArray(powerSpectrum, sampleRate);
+
+            audioRecord.startRecording();
+
+            while (!isCancelled()) {
+                try {
+                    maybePause();
+                } catch (InterruptedException e) {
+                    break;
+                }
+                if (Build.VERSION.SDK_INT >= 23) {
+                    audioRecord.read(data, 0, sampleSize, AudioRecord.READ_BLOCKING);
+                } else {
+                    audioRecord.read(data16Bit, 0, sampleSize);
+                    for (int i = 0; i < data16Bit.length; i++) {
+                        data[i] = data16Bit[i] > 0 ? data16Bit[i] / 32767f : data16Bit[i] / 32768f;
+                    }
+                }
+                fft.realForwardFull(data); // TODO native FFT
+                float max = Float.NEGATIVE_INFINITY;
+                for (int i = 0; i < data.length / 2; i++) {
+                    float re = data[2 * i];
+                    float im = data[2 * i + 1];
+                    powerSpectrum[i] = re * re + im * im;
+                    if (powerSpectrum[i] > max) {
+                        max = powerSpectrum[i];
+                    }
+                }
+// TODO mic spec req: http://source.android.com/compatibility/4.4/android-4.4-cdd.xhtml#section-5.4
+                for (int i = 0; i < powerSpectrum.length; i++) {
+                    powerSpectrum[i] = 10 * (float) Math.log10(powerSpectrum[i] / max);
+                }
+                publishProgress();
+            }
+            Log.d(TAG, "Stopping audio analysis...");
+            audioRecord.stop();
+            audioRecord.release();
+            //noinspection UnusedAssignment
+            audioRecord = null;
             return null;
         }
-    }
 
+        @Override
+        protected void onProgressUpdate(Void... values) {
+            powerSpectrumFrag.powerSpectrumComputed();
+        }
+    }
 }

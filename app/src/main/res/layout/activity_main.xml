@@ -17,27 +17,21 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:gravity="center">
 
-    <!--<android.support.design.widget.TabLayout-->
-        <!--android:id="@+id/tab_layout"-->
-        <!--android:layout_width="match_parent"-->
-        <!--android:layout_height="wrap_content"/>-->
-
-    <!--<android.support.v4.view.ViewPager-->
-        <!--android:id="@+id/pager"-->
-        <!--tools:context=".MainActivity"-->
-        <!--android:layout_height="match_parent"-->
-        <!--android:layout_width="match_parent"/>-->
-
-    <com.github.mikephil.charting.charts.LineChart
-        android:id="@+id/graph"
+    <!-- TODO -->
+    <fragment
+        android:id="@+id/power_spectrum"
+        android:name="com.crcrch.chromatictuner.app.PowerSpectrumFragment"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
+        android:layout_height="0dp"
+        android:layout_weight="1"/>
 
-    <TextView
-        android:layout_width="match_parent"
+    <Button
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"/>
+        android:onClick="toggleLiveSpectrum"
+        android:text="Freeze/Unfreeze"/><!-- FIXME -->
 
 </LinearLayout>
