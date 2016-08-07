@@ -22,6 +22,7 @@ import android.content.pm.PackageManager;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
@@ -34,15 +35,41 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import com.crcrch.chromatictuner.PowerSpectrumFragment;
+import com.crcrch.chromatictuner.WaveformBeatsFragment;
+import com.crcrch.chromatictuner.analysis.ConstantQTransform;
+import com.crcrch.chromatictuner.util.MiscMath;
 import com.crcrch.chromatictuner.util.MyAsyncTask;
-import org.jtransforms.fft.FloatFFT_1D;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private static final String USE_UNPROCESSED_AUDIO_SOURCE = "use unprocessed audio source";
     private static final int MY_PERMISSIONS_REQUEST_RECORD_AUDIO = 17;
+    private static final String STATE_USER_PAUSED = "userPaused";
+
+    // The reference sound pressure level.
+    //
+    // From http://source.android.com/compatibility/4.4/android-4.4-cdd.xhtml#section-5.4:
+    // "Audio input sensitivity SHOULD be set such that a 90 dB sound power level (SPL) source
+    // at 1000 Hz yields RMS of 2500 for 16-bit samples."
+    //
+    // From https://en.wikipedia.org/wiki/Sound_power#Sound_power_level:
+    // L_W = 10 log10 (P / P_0)
+    //
+    // From https://en.wikipedia.org/wiki/Sound_pressure#Sound_pressure_level:
+    // L_p = 20 log10 (P / P_0)
+    //
+    // Assuming that the android specification is referring to pressure and not power, we should use
+    // P_0 = P / 10^(L/20)
+    private static final double P_0 = 2500 / Math.pow(10, 90.0 / 20);
+
+    private static final double FREQUENCY_RESOLUTION = 60; // ==> time resolution of 1/60 s
+
     private AudioAnalyzer audioAnalyzer;
     private PowerSpectrumFragment powerSpectrumFrag;
+    private WaveformBeatsFragment waveformFrag;
+
+    private boolean userPaused;
 
     private static int getSampleRateToUse() {
         if (Build.VERSION.SDK_INT >= 24) {
@@ -51,12 +78,25 @@ public class MainActivity extends AppCompatActivity {
         return 44100;
     }
 
+    private static int getBufferSizeToUse(int encoding) {
+        int sampleRateToUse = getSampleRateToUse();
+        int minBufferSize = AudioRecord.getMinBufferSize(sampleRateToUse,
+                AudioFormat.CHANNEL_IN_DEFAULT, encoding);
+        if (sampleRateToUse == 0) {
+            sampleRateToUse = 44100;
+        }
+        int computedBufferSize = (int) (1.2 * sampleRateToUse / FREQUENCY_RESOLUTION);
+        return Math.max(2 * minBufferSize, computedBufferSize);
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         powerSpectrumFrag = (PowerSpectrumFragment) getSupportFragmentManager().findFragmentById(
                 R.id.power_spectrum);
+        waveformFrag = (WaveformBeatsFragment) getSupportFragmentManager().findFragmentById(
+                R.id.waveform);
     }
 
     @Override
@@ -77,14 +117,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onRestoreInstanceState(@NonNull Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        if (savedInstanceState.getBoolean(STATE_USER_PAUSED)) {
+            userPaused = true;
+        }
+    }
+
+    @Override
     public void onStart() {
         super.onStart();
-
         audioAnalyzer = new AudioAnalyzer();
+    }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 == PackageManager.PERMISSION_GRANTED) {
-            audioAnalyzer.execute();
+            runAudioAnalyzer();
             return;
         }
         if (ActivityCompat.shouldShowRequestPermissionRationale(this,
@@ -112,14 +163,41 @@ public class MainActivity extends AppCompatActivity {
             case MY_PERMISSIONS_REQUEST_RECORD_AUDIO:
                 if (grantResults.length > 0) {
                     if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                        audioAnalyzer.execute();
+                        runAudioAnalyzer();
                     } else {
-                        powerSpectrumFrag.getGraph().setNoDataTextDescription(getString(
-                                R.string.graph_no_data_description_permission_denied));
+                        powerSpectrumFrag.getGraph().setNoDataTextDescription(
+                                getString(R.string.graph_no_data_description_permission_denied));
+                        waveformFrag.getGraph().setNoDataTextDescription(
+                                getString(R.string.graph_no_data_description_permission_denied));
                         Log.e(TAG, "Record audio permission denied.");
                     }
                 }
         }
+    }
+
+    private void runAudioAnalyzer() {
+        if (AsyncTask.Status.PENDING == audioAnalyzer.getStatus()) {
+            if (userPaused) {
+                audioAnalyzer.pause();
+            }
+            audioAnalyzer.execute();
+        } else if (!userPaused) {
+            audioAnalyzer.resume();
+        }
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (userPaused) {
+            outState.putBoolean(STATE_USER_PAUSED, true);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        audioAnalyzer.pause();
     }
 
     @Override
@@ -151,31 +229,29 @@ public class MainActivity extends AppCompatActivity {
             return new AudioRecord.Builder()
                     .setAudioSource(getAudioSourceToUse())
                     .setAudioFormat(new AudioFormat.Builder().setEncoding(encoding).build())
+                    .setBufferSizeInBytes(getBufferSizeToUse(encoding))
                     .build();
         }
-        return new AudioRecord(
-                getAudioSourceToUse(),
-                getSampleRateToUse(),
-                AudioFormat.CHANNEL_IN_DEFAULT,
-                encoding,
-                AudioRecord.getMinBufferSize(getSampleRateToUse(), AudioFormat.CHANNEL_IN_DEFAULT,
-                        encoding));
+        return new AudioRecord(getAudioSourceToUse(), getSampleRateToUse(),
+                AudioFormat.CHANNEL_IN_DEFAULT, encoding, getBufferSizeToUse(encoding));
     }
 
     public void toggleLiveSpectrum(View view) {
+        userPaused = !userPaused;
         audioAnalyzer.togglePaused();
     }
 
     /**
-     * Computes power and phase spectra. This class should only be used in the visible lifecycle
-     * of the app.
+     * Computes the power spectrum. This class should only be used in the visible lifecycle of
+     * the app.
      */
-    private class AudioAnalyzer extends MyAsyncTask<Void, Void, Void> {
+    private class AudioAnalyzer extends MyAsyncTask<Void, Boolean, Void> {
         private static final String TAG = "AudioAnalyzer";
-        private static final int UPDATES_PER_SECOND = 60;
 
         @Override
         protected Void doInBackground(Void... voids) {
+            double referenceFreq = 440.0;
+
             Log.d(TAG, "Starting audio analysis...");
             AudioRecord audioRecord;
             if (Build.VERSION.SDK_INT >= 23) {
@@ -185,21 +261,41 @@ public class MainActivity extends AppCompatActivity {
             }
 
             int sampleRate = audioRecord.getSampleRate();
-            int sampleSize = (int) ((double) sampleRate / UPDATES_PER_SECOND);
-            FloatFFT_1D fft = new FloatFFT_1D(sampleSize);
 
-            float[] data = new float[2 * sampleSize];
+            ConstantQTransform constantQ = ConstantQTransform.new12TetConstantQTransform(null,
+                    sampleRate, 440 / Math.pow(2, 7.0 / 12), 36);
+            int numSamples = constantQ.getNumSamples();
+
+            float[] data = new float[2 * numSamples];
             short[] data16Bit;
             if (Build.VERSION.SDK_INT >= 23) {
                 data16Bit = new short[0];
             } else {
-                data16Bit = new short[sampleSize];
+                data16Bit = new short[numSamples];
             }
 
-            float[] powerSpectrum = new float[sampleSize];
-            float[] phaseSpectrum = new float[sampleSize];
+            float[] waveform = new float[numSamples];
+            int numSamplesPerReferenceCycle = (int) (numSamples / referenceFreq);
 
-            powerSpectrumFrag.setPowerSpectrumArray(powerSpectrum, sampleRate);
+            // Since the number of samples taken will not always be exactly an integer multiple
+            // of the reference frequency, we apply an offset to the sampled wave before adding
+            // it to the reference wave.
+            int referenceWaveformOffset =
+                    numSamplesPerReferenceCycle - (numSamples % numSamplesPerReferenceCycle);
+
+            float[] powerSpectrum = new float[constantQ.getNumCoefficients()];
+
+            try {
+                maybePause();
+            } catch (InterruptedException e) {
+                return null;
+            }
+
+            waveformFrag.setReferenceFrequency(referenceFreq);
+            waveformFrag.setData(waveform);
+
+            powerSpectrumFrag.configureSpectrum(constantQ.getRatio(), constantQ.getMinFrequency());
+            powerSpectrumFrag.setData(powerSpectrum);
 
             audioRecord.startRecording();
 
@@ -210,27 +306,25 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 }
                 if (Build.VERSION.SDK_INT >= 23) {
-                    audioRecord.read(data, 0, sampleSize, AudioRecord.READ_BLOCKING);
+                    audioRecord.read(data, 0, numSamples, AudioRecord.READ_BLOCKING);
                 } else {
-                    audioRecord.read(data16Bit, 0, sampleSize);
+                    audioRecord.read(data16Bit, 0, numSamples);
                     for (int i = 0; i < data16Bit.length; i++) {
                         data[i] = data16Bit[i] > 0 ? data16Bit[i] / 32767f : data16Bit[i] / 32768f;
                     }
                 }
-                fft.realForwardFull(data); // TODO native FFT
-                float max = Float.NEGATIVE_INFINITY;
-                for (int i = 0; i < data.length / 2; i++) {
-                    float re = data[2 * i];
-                    float im = data[2 * i + 1];
-                    powerSpectrum[i] = re * re + im * im;
-                    if (powerSpectrum[i] > max) {
-                        max = powerSpectrum[i];
-                    }
+
+                double referenceAmplitude = MiscMath.rms(data, 0, numSamples);
+
+                int numReferenceSamples = (int) (numSamplesPerReferenceCycle * referenceFreq);
+                for (int i = 0; i < numReferenceSamples; i++) {
+                    double t = (double) i / sampleRate;
+                    double a = referenceAmplitude * Math.sin(2 * Math.PI * referenceFreq * t);
+                    waveform[i] = 0.5f * (float) a + 0.5f * data[i + referenceWaveformOffset];
                 }
-// TODO mic spec req: http://source.android.com/compatibility/4.4/android-4.4-cdd.xhtml#section-5.4
-                for (int i = 0; i < powerSpectrum.length; i++) {
-                    powerSpectrum[i] = 10 * (float) Math.log10(powerSpectrum[i] / max);
-                }
+
+                constantQ.realConstantQPowerDbFull(data, powerSpectrum, P_0);
+
                 publishProgress();
             }
             Log.d(TAG, "Stopping audio analysis...");
@@ -241,9 +335,11 @@ public class MainActivity extends AppCompatActivity {
             return null;
         }
 
+
         @Override
-        protected void onProgressUpdate(Void... values) {
-            powerSpectrumFrag.powerSpectrumComputed();
+        protected void onProgressUpdate(Boolean... values) {
+            waveformFrag.notifyDataSetChanged();
+            powerSpectrumFrag.notifyDataSetChanged();
         }
     }
 }

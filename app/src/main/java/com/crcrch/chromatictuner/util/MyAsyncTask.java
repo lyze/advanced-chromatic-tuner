@@ -56,4 +56,10 @@ public abstract class MyAsyncTask<Params, Progress, Result>
             }
         }
     }
+
+    public boolean isPaused() {
+        synchronized (lock) {
+            return paused;
+        }
+    }
 }

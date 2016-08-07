@@ -13,10 +13,29 @@
  * specific language governing permissions and limitations under the License.
  */
 
-package com.crcrch.chromatictuner.app;
+package com.crcrch.chromatictuner.util;
 
-import android.preference.PreferenceActivity;
+public final class MiscMath {
+    private MiscMath() {
+    }
 
-public class SettingsActivity extends PreferenceActivity {
-    // TODO settings
+    public static int toIntExact(long n) {
+        if ((int) n != n) {
+            throw new ArithmeticException("integer overflow");
+        }
+        return (int) n;
+    }
+
+    public static double rms(float[] a, int offset, int length) {
+        if (a.length == 0) {
+            return 0;
+        }
+
+        float sumOfSquares = 0;
+        for (int i = offset; i < offset + length; i++) {
+            sumOfSquares += a[i] * a[i];
+        }
+        return Math.sqrt(sumOfSquares / length);
+
+    }
 }

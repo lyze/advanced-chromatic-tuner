@@ -13,7 +13,7 @@
  * specific language governing permissions and limitations under the License.
  */
 
-package com.crcrch.chromatictuner.app;
+package com.crcrch.chromatictuner;
 
 import android.os.Parcel;
 import com.github.mikephil.charting.data.Entry;
@@ -44,7 +44,6 @@ public class FloatArrayEntry extends Entry {
     public Entry copy() {
         throw new UnsupportedOperationException();
     }
-
 
     @Override
     public int describeContents() {

@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <!--
   ~ Copyright 2016 David Xu. All rights reserved.
   ~
@@ -13,18 +14,8 @@
   ~ specific language governing permissions and limitations under the License.
   -->
 
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context="com.crcrch.chromatictuner.SimpleTuningFragment"
-    android:orientation="vertical">
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textAppearance="?android:attr/textAppearanceLarge"
-        android:text="Large Text"
-        android:id="@+id/textView"/>
-
-</LinearLayout>
+<resources>
+    <declare-styleable name="GraphFragment">
+        <attr name="graphDescription" format="string"/>
+    </declare-styleable>
+</resources>

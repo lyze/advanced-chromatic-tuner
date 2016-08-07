@@ -13,7 +13,7 @@
  * specific language governing permissions and limitations under the License.
  */
 
-package com.crcrch.chromatictuner.app;
+package com.crcrch.chromatictuner;
 
 import android.content.Context;
 import android.os.Bundle;
@@ -21,6 +21,7 @@ import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import com.crcrch.chromatictuner.app.R;
 
 
 public class SimpleTuningFragment extends Fragment {

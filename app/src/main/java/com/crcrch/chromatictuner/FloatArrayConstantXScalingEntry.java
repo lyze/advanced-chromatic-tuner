@@ -13,7 +13,7 @@
  * specific language governing permissions and limitations under the License.
  */
 
-package com.crcrch.chromatictuner.app;
+package com.crcrch.chromatictuner;
 
 public class FloatArrayConstantXScalingEntry extends FloatArrayEntry {
     private final float xConstantScale;
