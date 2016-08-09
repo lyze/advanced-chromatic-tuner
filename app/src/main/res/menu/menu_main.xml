@@ -17,8 +17,16 @@
       xmlns:app="http://schemas.android.com/apk/res-auto"
       xmlns:tools="http://schemas.android.com/tools"
       tools:context=".MainActivity">
-    <item android:id="@+id/action_settings"
+
+    <item
+        android:id="@+id/action_analysis_settings"
+        android:icon="@drawable/ic_tune_black_24dp"
+        android:title="@string/action_configure_analysis"
+        app:showAsAction="ifRoom"/>
+
+    <item android:id="@+id/action_app_settings"
           android:title="@string/action_settings"
           android:orderInCategory="100"
           app:showAsAction="never"/>
+
 </menu>

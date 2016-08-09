@@ -16,6 +16,8 @@
 package com.crcrch.chromatictuner.app;
 
 import android.Manifest;
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -31,17 +33,23 @@ import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import com.crcrch.chromatictuner.PowerSpectrumFragment;
 import com.crcrch.chromatictuner.WaveformBeatsFragment;
 import com.crcrch.chromatictuner.analysis.ConstantQTransform;
 import com.crcrch.chromatictuner.util.MiscMath;
 import com.crcrch.chromatictuner.util.MyAsyncTask;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity
+        implements NotePickerFragment.OnFrequencySelectedListener {
     private static final String TAG = "MainActivity";
     private static final String USE_UNPROCESSED_AUDIO_SOURCE = "use unprocessed audio source";
     private static final int MY_PERMISSIONS_REQUEST_RECORD_AUDIO = 17;
@@ -61,13 +69,23 @@ public class MainActivity extends AppCompatActivity {
     //
     // Assuming that the android specification is referring to pressure and not power, we should use
     // P_0 = P / 10^(L/20)
-    private static final double P_0 = 2500 / Math.pow(10, 90.0 / 20);
+    private static final double P_0 = 2500 / Math.pow(10, 90.0 / 20); // TODO verify reference p_0
 
     private static final double FREQUENCY_RESOLUTION = 60; // ==> time resolution of 1/60 s
+    private static final String STATE_TUNING_FREQUENCY = "tuningFreq";
 
     private AudioAnalyzer audioAnalyzer;
+
+    private ProgressBar loadingView;
+    private int shortAnimationDuration;
+
+    private LinearLayout analysisView;
+
     private PowerSpectrumFragment powerSpectrumFrag;
     private WaveformBeatsFragment waveformFrag;
+
+    private EditText freqInput;
+    private double tuningFrequency;
 
     private boolean userPaused;
 
@@ -82,21 +100,119 @@ public class MainActivity extends AppCompatActivity {
         int sampleRateToUse = getSampleRateToUse();
         int minBufferSize = AudioRecord.getMinBufferSize(sampleRateToUse,
                 AudioFormat.CHANNEL_IN_DEFAULT, encoding);
-        if (sampleRateToUse == 0) {
-            sampleRateToUse = 44100;
-        }
-        int computedBufferSize = (int) (1.2 * sampleRateToUse / FREQUENCY_RESOLUTION);
+        double fftBinResolution = sampleRateToUse / FREQUENCY_RESOLUTION;
+        int computedBufferSize = (int) (2 * fftBinResolution);
         return Math.max(2 * minBufferSize, computedBufferSize);
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (savedInstanceState == null) {
+            tuningFrequency = getDefaultTuningFrequency();
+        } else {
+            tuningFrequency = savedInstanceState.getDouble(STATE_TUNING_FREQUENCY);
+        }
+
         setContentView(R.layout.activity_main);
+
+        loadingView = (ProgressBar) findViewById(R.id.loading_spinner);
+        loadingView.setVisibility(View.GONE);
+        shortAnimationDuration = getResources().getInteger(android.R.integer.config_shortAnimTime);
+
+        analysisView = (LinearLayout) findViewById(R.id.analysis_view);
+
         powerSpectrumFrag = (PowerSpectrumFragment) getSupportFragmentManager().findFragmentById(
                 R.id.power_spectrum);
         waveformFrag = (WaveformBeatsFragment) getSupportFragmentManager().findFragmentById(
                 R.id.waveform);
+
+        freqInput = (EditText) findViewById(R.id.tuning_frequency);
+
+        setTuningFrequencyEditText(tuningFrequency);
+        // Changes to the frequency EditText in the view will reconfigure the analysis
+        freqInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence charSequence, int start, int count,
+                                          int after) { /* no-op*/ }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int after) {
+                /* no-op*/
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                try {
+                    double f = Double.parseDouble(s.toString());
+                    if (f <= 0) {
+                        freqInput.setError(getString(R.string.error_not_positive_decimal));
+                        return;
+                    }
+                    if (f > getMaxFrequency()) {
+                        freqInput.setError(String.format(getString(
+                                R.string.error_frequency_exceeded_maximum),
+                                getMaxFrequency()));
+                        return;
+                    }
+
+                    freqInput.setError(null);
+
+                    if (tuningFrequency != f) {
+                        tuningFrequency = f;
+                        reconfigureAnalyzer();
+                    }
+
+                } catch (NumberFormatException e) {
+                    freqInput.setError(getString(R.string.error_not_positive_decimal));
+                }
+            }
+        });
+    }
+
+    private void setTuningFrequencyEditText(double f) {
+        freqInput.setText(String.valueOf(f));
+    }
+
+    private double getDefaultTuningFrequency() { // TODO
+        return 440;
+    }
+
+    private double getMaxFrequency() { // TODO also determine valid sampling rates
+        return 880.69;
+    }
+
+    private void crossFade(final View toBeGone, View toBeVisible) {
+        if (Build.VERSION.SDK_INT > 11) {
+            toBeVisible.setAlpha(0f);
+            toBeVisible.setVisibility(View.VISIBLE);
+            toBeVisible.animate()
+                    .alpha(1f)
+                    .setDuration(shortAnimationDuration)
+                    .setListener(null);
+
+            toBeGone.animate()
+                    .alpha(0f)
+                    .setDuration(shortAnimationDuration)
+                    .setListener(new AnimatorListenerAdapter() {
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                            toBeGone.setVisibility(View.GONE);
+                        }
+                    });
+        } else {
+            toBeVisible.setVisibility(View.VISIBLE);
+            toBeGone.setVisibility(View.GONE);
+        }
+    }
+
+    private void reconfigureAnalyzer() {
+        Log.d(TAG, "Reconfiguring audio analyzer...");
+        crossFade(analysisView, loadingView);
+
+        audioAnalyzer.cancel(true);
+        audioAnalyzer = new AudioAnalyzer(tuningFrequency);
+        audioAnalyzer.execute();
     }
 
     @Override
@@ -108,7 +224,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-            case R.id.action_settings:
+            case R.id.action_analysis_settings:
+                // TODO analysis settings
+                return true;
+            case R.id.action_app_settings:
                 startActivity(new Intent(this, SettingsActivity.class));
                 return true;
             default:
@@ -122,12 +241,13 @@ public class MainActivity extends AppCompatActivity {
         if (savedInstanceState.getBoolean(STATE_USER_PAUSED)) {
             userPaused = true;
         }
+        tuningFrequency = savedInstanceState.getDouble(STATE_TUNING_FREQUENCY);
     }
 
     @Override
     public void onStart() {
         super.onStart();
-        audioAnalyzer = new AudioAnalyzer();
+        audioAnalyzer = new AudioAnalyzer(tuningFrequency);
     }
 
     @Override
@@ -135,21 +255,22 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 == PackageManager.PERMISSION_GRANTED) {
-            runAudioAnalyzer();
+            startAudioAnalyzer();
             return;
         }
         if (ActivityCompat.shouldShowRequestPermissionRationale(this,
                 Manifest.permission.RECORD_AUDIO)) {
             Snackbar.make(getWindow().getDecorView().getRootView(),
                     R.string.permission_record_audio_rationale,
-                    Snackbar.LENGTH_INDEFINITE).setAction(R.string.ok, new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    ActivityCompat.requestPermissions(MainActivity.this,
-                            new String[] {Manifest.permission.RECORD_AUDIO},
-                            MY_PERMISSIONS_REQUEST_RECORD_AUDIO);
-                }
-            }).show();
+                    Snackbar.LENGTH_INDEFINITE).setAction(android.R.string.ok,
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            ActivityCompat.requestPermissions(MainActivity.this,
+                                    new String[] {Manifest.permission.RECORD_AUDIO},
+                                    MY_PERMISSIONS_REQUEST_RECORD_AUDIO);
+                        }
+                    }).show();
         } else {
             ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.RECORD_AUDIO},
                     MY_PERMISSIONS_REQUEST_RECORD_AUDIO);
@@ -163,7 +284,7 @@ public class MainActivity extends AppCompatActivity {
             case MY_PERMISSIONS_REQUEST_RECORD_AUDIO:
                 if (grantResults.length > 0) {
                     if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                        runAudioAnalyzer();
+                        startAudioAnalyzer();
                     } else {
                         powerSpectrumFrag.getGraph().setNoDataTextDescription(
                                 getString(R.string.graph_no_data_description_permission_denied));
@@ -175,7 +296,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void runAudioAnalyzer() {
+    private void startAudioAnalyzer() {
         if (AsyncTask.Status.PENDING == audioAnalyzer.getStatus()) {
             if (userPaused) {
                 audioAnalyzer.pause();
@@ -191,6 +312,7 @@ public class MainActivity extends AppCompatActivity {
         super.onSaveInstanceState(outState);
         if (userPaused) {
             outState.putBoolean(STATE_USER_PAUSED, true);
+            outState.putDouble(STATE_TUNING_FREQUENCY, tuningFrequency);
         }
     }
 
@@ -226,12 +348,18 @@ public class MainActivity extends AppCompatActivity {
 
     private AudioRecord newAudioRecord(int encoding) {
         if (Build.VERSION.SDK_INT >= 23) {
-            return new AudioRecord.Builder()
+
+            AudioRecord.Builder builder = new AudioRecord.Builder()
                     .setAudioSource(getAudioSourceToUse())
-                    .setAudioFormat(new AudioFormat.Builder().setEncoding(encoding).build())
-                    .setBufferSizeInBytes(getBufferSizeToUse(encoding))
-                    .build();
+                    .setAudioFormat(new AudioFormat.Builder().setEncoding(encoding).build());
+
+            if (Build.VERSION.SDK_INT >= 24
+                    && getSampleRateToUse() == AudioFormat.SAMPLE_RATE_UNSPECIFIED) {
+                return builder.build();
+            }
+            return builder.setBufferSizeInBytes(getBufferSizeToUse(encoding)).build();
         }
+
         return new AudioRecord(getAudioSourceToUse(), getSampleRateToUse(),
                 AudioFormat.CHANNEL_IN_DEFAULT, encoding, getBufferSizeToUse(encoding));
     }
@@ -241,17 +369,33 @@ public class MainActivity extends AppCompatActivity {
         audioAnalyzer.togglePaused();
     }
 
+    @Override
+    public void onFrequencySelected(double frequency) {
+        setTuningFrequencyEditText(frequency);
+    }
+
+    public void showNotePicker(View view) {
+        NotePickerFragment.newInstance(tuningFrequency, getMaxFrequency())
+                .show(getSupportFragmentManager(), null);
+    }
+
     /**
      * Computes the power spectrum. This class should only be used in the visible lifecycle of
      * the app.
      */
     private class AudioAnalyzer extends MyAsyncTask<Void, Boolean, Void> {
         private static final String TAG = "AudioAnalyzer";
+        private final double tuningFrequency;
+
+        public AudioAnalyzer(double tuningFrequency) {
+            if (tuningFrequency <= 0) {
+                throw new IllegalArgumentException("nonpositive frequency: " + tuningFrequency);
+            }
+            this.tuningFrequency = tuningFrequency;
+        }
 
         @Override
         protected Void doInBackground(Void... voids) {
-            double referenceFreq = 440.0;
-
             Log.d(TAG, "Starting audio analysis...");
             AudioRecord audioRecord;
             if (Build.VERSION.SDK_INT >= 23) {
@@ -263,7 +407,7 @@ public class MainActivity extends AppCompatActivity {
             int sampleRate = audioRecord.getSampleRate();
 
             ConstantQTransform constantQ = ConstantQTransform.new12TetConstantQTransform(null,
-                    sampleRate, 440 / Math.pow(2, 7.0 / 12), 36);
+                    sampleRate, tuningFrequency / Math.pow(2, 7.0 / 12), 36); // TODO center transform and ensure sane performance
             int numSamples = constantQ.getNumSamples();
 
             float[] data = new float[2 * numSamples];
@@ -275,7 +419,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             float[] waveform = new float[numSamples];
-            int numSamplesPerReferenceCycle = (int) (numSamples / referenceFreq);
+            int numSamplesPerReferenceCycle = (int) (numSamples / tuningFrequency);
 
             // Since the number of samples taken will not always be exactly an integer multiple
             // of the reference frequency, we apply an offset to the sampled wave before adding
@@ -291,13 +435,15 @@ public class MainActivity extends AppCompatActivity {
                 return null;
             }
 
-            waveformFrag.setReferenceFrequency(referenceFreq);
+            waveformFrag.setReferenceFrequency(tuningFrequency);
             waveformFrag.setData(waveform);
 
             powerSpectrumFrag.configureSpectrum(constantQ.getRatio(), constantQ.getMinFrequency());
             powerSpectrumFrag.setData(powerSpectrum);
 
             audioRecord.startRecording();
+
+            publishProgress(true);
 
             while (!isCancelled()) {
                 try {
@@ -316,16 +462,16 @@ public class MainActivity extends AppCompatActivity {
 
                 double referenceAmplitude = MiscMath.rms(data, 0, numSamples);
 
-                int numReferenceSamples = (int) (numSamplesPerReferenceCycle * referenceFreq);
+                int numReferenceSamples = (int) (numSamplesPerReferenceCycle * tuningFrequency);
                 for (int i = 0; i < numReferenceSamples; i++) {
                     double t = (double) i / sampleRate;
-                    double a = referenceAmplitude * Math.sin(2 * Math.PI * referenceFreq * t);
+                    double a = referenceAmplitude * Math.sin(2 * Math.PI * tuningFrequency * t);
                     waveform[i] = 0.5f * (float) a + 0.5f * data[i + referenceWaveformOffset];
                 }
 
                 constantQ.realConstantQPowerDbFull(data, powerSpectrum, P_0);
 
-                publishProgress();
+                publishProgress(false);
             }
             Log.d(TAG, "Stopping audio analysis...");
             audioRecord.stop();
@@ -338,8 +484,12 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         protected void onProgressUpdate(Boolean... values) {
-            waveformFrag.notifyDataSetChanged();
-            powerSpectrumFrag.notifyDataSetChanged();
+            if (values[0]) {
+                crossFade(loadingView, analysisView);
+            } else {
+                waveformFrag.notifyDataSetChanged();
+                powerSpectrumFrag.notifyDataSetChanged();
+            }
         }
     }
 }
