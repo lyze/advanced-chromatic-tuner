@@ -38,4 +38,14 @@ public final class MiscMath {
         return Math.sqrt(sumOfSquares / length);
 
     }
+
+    /**
+     * Returns the result of dividing {@code p} by {@code q} by rounding up.
+     * @param p the numerator
+     * @param q the denominator
+     * @return {@code p/q} rounding up
+     */
+    public static int divideRoundingUp(int p, int q) {
+        return (p - 1) / q + 1;
+    }
 }

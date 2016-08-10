@@ -28,8 +28,7 @@
     <string name="graph_description_power_spectrum">Constant Q power spectrum</string>
     <string name="graph_no_data">No audio data available.</string>
     <string name="graph_no_data_description_permission_denied">Record audio permission denied. Enable this permission for pitch analysis.</string>
-    <string name="graph_description_waveform_beats">input + %.2f Hz</string>
-    <string name="decimal_mark">.</string>
+    <string name="graph_description_waveform_beats">Input + %.2f Hz</string>
     <string name="hz">Hz</string>
     <string name="error_frequency_exceeded_maximum">exceeds the maximum measurable frequency of %.2f Hz</string>
     <string name="error_not_positive_decimal">not a positive decimal number</string>
@@ -39,4 +38,5 @@
     <string name="dialog_title_note_picker">Pitch selection</string>
     <string name="error_audio_record_failure">A problem occurred while capturing audio.</string>
     <string name="title_activity_constant_q">Constant Q Spectrum</string>
+    <string name="graph_description_pll">Locked frequency</string>
 </resources>

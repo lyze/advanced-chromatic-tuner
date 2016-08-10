@@ -34,15 +34,6 @@ public class WaveformBeatsFragment extends GraphFragment {
     }
 
     @Override
-    protected LineDataSet createLineDataSet(@NonNull float[] data) {
-        List<Entry> amplitudes = new ArrayList<>(data.length);
-        for (int i = 0; i < data.length; i++) {
-            amplitudes.add(new FloatArrayEntry(data, i));
-        }
-        return new LineDataSet(amplitudes, null);
-    }
-
-    @Override
     protected void configureGraph(LineChart graph, LineDataSet series) {
         graph.setDescription(String.format(
                 getActivity().getString(R.string.graph_description_waveform_beats),

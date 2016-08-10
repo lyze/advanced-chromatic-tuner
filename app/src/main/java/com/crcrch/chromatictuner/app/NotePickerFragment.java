@@ -58,7 +58,8 @@ public class NotePickerFragment extends DialogFragment {
     }
 
     private static int getNoteForFrequency(double f) {
-        return (int) (MiscMusic.CHROMATIC_SCALE.length * Math.log(f / 440) / Math.log(2)) + 57;
+        return (int) (MiscMusic.CHROMATIC_SCALE.length * Math.log(f / MiscMusic.A4) / Math.log(2))
+                + 57;
     }
 
     private static int getOctaveForNote(int note) {
@@ -66,7 +67,7 @@ public class NotePickerFragment extends DialogFragment {
     }
 
     private static double getFrequencyForNote(int note) {
-        return Math.pow(2, (note - 57.0) / MiscMusic.CHROMATIC_SCALE.length) * 440;
+        return Math.pow(2, (note - 57.0) / MiscMusic.CHROMATIC_SCALE.length) * MiscMusic.A4;
     }
 
     private static int getOctaveForFrequency(double f) {

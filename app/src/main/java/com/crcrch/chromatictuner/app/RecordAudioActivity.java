@@ -30,18 +30,9 @@ import com.crcrch.chromatictuner.util.MyAsyncTask;
 
 public abstract class RecordAudioActivity<Params, Progress, Result> extends AppCompatActivity {
     private static final int MY_PERMISSIONS_REQUEST_RECORD_AUDIO = 17;
-    private static final String STATE_USER_PAUSED = "userPaused";
 
     protected MyAsyncTask<Params, Progress, Result> audioAnalyzer;
-    protected boolean userPaused;
 
-    @Override
-    protected void onRestoreInstanceState(@NonNull Bundle savedInstanceState) {
-        super.onRestoreInstanceState(savedInstanceState);
-        if (savedInstanceState.getBoolean(STATE_USER_PAUSED)) {
-            userPaused = true;
-        }
-    }
 
     @Override
     protected void onResume() {
@@ -86,14 +77,6 @@ public abstract class RecordAudioActivity<Params, Progress, Result> extends AppC
     }
 
     @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
-        if (userPaused) {
-            outState.putBoolean(STATE_USER_PAUSED, true);
-        }
-    }
-
-    @Override
     protected void onPause() {
         super.onPause();
         audioAnalyzer.pause();
@@ -117,17 +100,14 @@ public abstract class RecordAudioActivity<Params, Progress, Result> extends AppC
     @CallSuper
     protected void onAudioRecordPermissionGranted() {
         if (AsyncTask.Status.PENDING == audioAnalyzer.getStatus()) {
-            if (userPaused) {
-                audioAnalyzer.pause();
-            }
             executeAudioAnalyzer(audioAnalyzer);
-        } else if (!userPaused) {
+        } else {
             audioAnalyzer.resume();
         }
     }
 
-    protected abstract void executeAudioAnalyzer(MyAsyncTask<Params, Progress, Result>
-                                                         audioAnalyzer);
+    protected abstract void executeAudioAnalyzer(
+            @NonNull MyAsyncTask<Params, Progress, Result> audioAnalyzer);
 
     protected abstract void onRecordAudioPermissionDenied();
 

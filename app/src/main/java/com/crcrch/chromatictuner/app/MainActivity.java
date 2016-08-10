@@ -15,8 +15,6 @@
 
 package com.crcrch.chromatictuner.app;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
 import android.content.Intent;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
@@ -33,31 +31,14 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
-import com.crcrch.chromatictuner.PowerSpectrumFragment;
 import com.crcrch.chromatictuner.WaveformBeatsFragment;
-import com.crcrch.chromatictuner.analysis.ConstantQTransform;
+import com.crcrch.chromatictuner.util.AnimationUtils;
 import com.crcrch.chromatictuner.util.MiscMath;
 import com.crcrch.chromatictuner.util.MyAsyncTask;
 
 public class MainActivity extends RecordAudioActivity<Void, Integer, Void>
         implements NotePickerFragment.OnFrequencySelectedListener {
     private static final String TAG = "MainActivity";
-
-    // The reference sound pressure level.
-    //
-    // From http://source.android.com/compatibility/4.4/android-4.4-cdd.xhtml#section-5.4:
-    // "Audio input sensitivity SHOULD be set such that a 90 dB sound power level (SPL) source
-    // at 1000 Hz yields RMS of 2500 for 16-bit samples."
-    //
-    // From https://en.wikipedia.org/wiki/Sound_power#Sound_power_level:
-    // L_W = 10 log10 (P / P_0)
-    //
-    // From https://en.wikipedia.org/wiki/Sound_pressure#Sound_pressure_level:
-    // L_p = 20 log10 (P / P_0)
-    //
-    // Assuming that the android specification is referring to pressure and not power, we should use
-    // P_0 = P / 10^(L/20)
-    private static final double P_0 = 2500 / Math.pow(10, 90.0 / 20); // TODO verify reference p_0
 
     private static final String STATE_TUNING_FREQUENCY = "tuningFreq";
 
@@ -68,7 +49,6 @@ public class MainActivity extends RecordAudioActivity<Void, Integer, Void>
 
     private LinearLayout analysisView;
 
-    private PowerSpectrumFragment powerSpectrumFrag;
     private WaveformBeatsFragment waveformFrag;
 
     private EditText freqInput;
@@ -91,12 +71,9 @@ public class MainActivity extends RecordAudioActivity<Void, Integer, Void>
         setContentView(R.layout.activity_main);
 
         loadingView = (ProgressBar) findViewById(R.id.loading_spinner);
-        loadingView.setVisibility(View.GONE);
 
         analysisView = (LinearLayout) findViewById(R.id.analysis_view);
 
-        powerSpectrumFrag = (PowerSpectrumFragment) getSupportFragmentManager().findFragmentById(
-                R.id.power_spectrum);
         waveformFrag = (WaveformBeatsFragment) getSupportFragmentManager().findFragmentById(
                 R.id.waveform);
 
@@ -147,33 +124,9 @@ public class MainActivity extends RecordAudioActivity<Void, Integer, Void>
         freqInput.setText(String.valueOf(f));
     }
 
-    private void crossFade(final View toBeGone, View toBeVisible) {
-        if (Build.VERSION.SDK_INT > 11) {
-            toBeVisible.setAlpha(0f);
-            toBeVisible.setVisibility(View.VISIBLE);
-            toBeVisible.animate()
-                    .alpha(1f)
-                    .setDuration(shortAnimationDuration)
-                    .setListener(null);
-
-            toBeGone.animate()
-                    .alpha(0f)
-                    .setDuration(shortAnimationDuration)
-                    .setListener(new AnimatorListenerAdapter() {
-                        @Override
-                        public void onAnimationEnd(Animator animation) {
-                            toBeGone.setVisibility(View.GONE);
-                        }
-                    });
-        } else {
-            toBeVisible.setVisibility(View.VISIBLE);
-            toBeGone.setVisibility(View.GONE);
-        }
-    }
-
     private void reconfigureAnalyzer() {
         Log.d(TAG, "Reconfiguring audio analyzer...");
-        crossFade(analysisView, loadingView);
+        AnimationUtils.switchOutIn(analysisView, loadingView);
 
         audioAnalyzer.cancel(true);
         audioAnalyzer = createAudioAnalyzer();
@@ -182,9 +135,7 @@ public class MainActivity extends RecordAudioActivity<Void, Integer, Void>
 
     @Override
     protected AudioAnalyzer createAudioAnalyzer() {
-        return new AudioAnalyzer(tuningFrequency, analysisConfig.getMinFrequencyBin(),
-                analysisConfig.getFrequencyBinRatio(),
-                analysisConfig.getNumFrequencyBins());
+        return new AudioAnalyzer(tuningFrequency);
     }
 
     @Override
@@ -221,45 +172,19 @@ public class MainActivity extends RecordAudioActivity<Void, Integer, Void>
 
     @Override
     protected void onAudioRecordPermissionGranted() {
+        AnimationUtils.switchOutIn(analysisView, loadingView);
         super.onAudioRecordPermissionGranted();
-        crossFade(analysisView, loadingView);
     }
 
     @Override
-    protected void executeAudioAnalyzer(MyAsyncTask<Void, Integer, Void> audioAnalyzer) {
+    protected void executeAudioAnalyzer(@NonNull MyAsyncTask<Void, Integer, Void> audioAnalyzer) {
         audioAnalyzer.execute();
     }
 
     @Override
     protected void onRecordAudioPermissionDenied() {
-        powerSpectrumFrag.getGraph().setNoDataTextDescription(
-                getString(R.string.graph_no_data_description_permission_denied));
         waveformFrag.getGraph().setNoDataTextDescription(
                 getString(R.string.graph_no_data_description_permission_denied));
-    }
-
-    private AudioRecord newAudioRecord(int encoding) {
-        if (Build.VERSION.SDK_INT >= 23) {
-            AudioRecord.Builder builder = new AudioRecord.Builder()
-                    .setAudioSource(analysisConfig.getAudioSourceToUse())
-                    .setAudioFormat(new AudioFormat.Builder().setEncoding(encoding).build());
-
-            if (Build.VERSION.SDK_INT >= 24
-                    && analysisConfig.getPreferredSampleRate() == AudioFormat.SAMPLE_RATE_UNSPECIFIED) {
-                return builder.build();
-            }
-            return builder.setBufferSizeInBytes(analysisConfig.getBufferSizeToUse(encoding))
-                    .build();
-        }
-
-        return new AudioRecord(analysisConfig.getAudioSourceToUse(),
-                analysisConfig.getPreferredSampleRate(), AudioFormat.CHANNEL_IN_DEFAULT, encoding,
-                analysisConfig.getBufferSizeToUse(encoding));
-    }
-
-    public void toggleLiveSpectrum(View view) {
-        userPaused = !userPaused;
-        audioAnalyzer.togglePaused();
     }
 
     @Override
@@ -272,26 +197,21 @@ public class MainActivity extends RecordAudioActivity<Void, Integer, Void>
                 .show(getSupportFragmentManager(), null);
     }
 
+
     /**
      * Computes the power spectrum. This class should only be used in the visible lifecycle of
      * the app.
      */
     private class AudioAnalyzer extends MyAsyncTask<Void, Integer, Void> {
         private static final String TAG = "AudioAnalyzer";
+        private static final int UPDATES_PER_SECOND = 60;
         private final double tuningFrequency;
-        private final double freqBinRatio;
-        private final double minFreqBin;
-        private final int numFreqBins;
 
-        public AudioAnalyzer(double tuningFrequency, double minFreqBin, double freqBinRatio,
-                             int numFreqBins) {
+        public AudioAnalyzer(double tuningFrequency) {
             if (tuningFrequency <= 0) {
                 throw new IllegalArgumentException("non-positive frequency: " + tuningFrequency);
             }
             this.tuningFrequency = tuningFrequency;
-            this.freqBinRatio = freqBinRatio;
-            this.minFreqBin = minFreqBin;
-            this.numFreqBins = numFreqBins;
         }
 
         @Override
@@ -299,41 +219,27 @@ public class MainActivity extends RecordAudioActivity<Void, Integer, Void>
             Log.d(TAG, "Starting audio analysis...");
             AudioRecord audioRecord;
             if (Build.VERSION.SDK_INT >= 23) {
-                audioRecord = newAudioRecord(AudioFormat.ENCODING_PCM_FLOAT);
+                audioRecord = new AudioRecord(analysisConfig.getAudioSourceToUse(),
+                        analysisConfig.getPreferredSampleRate(), AudioFormat.CHANNEL_IN_DEFAULT,
+                        AudioFormat.ENCODING_PCM_FLOAT,
+                        analysisConfig.getAudioBufferSize(AudioFormat.ENCODING_PCM_FLOAT));
             } else {
-                audioRecord = newAudioRecord(AudioFormat.ENCODING_PCM_16BIT);
+                audioRecord = new AudioRecord(analysisConfig.getAudioSourceToUse(),
+                        analysisConfig.getPreferredSampleRate(), AudioFormat.CHANNEL_IN_DEFAULT,
+                        AudioFormat.ENCODING_PCM_16BIT,
+                        analysisConfig.getAudioBufferSize(AudioFormat.ENCODING_PCM_16BIT));
             }
 
             int sampleRate = audioRecord.getSampleRate();
+            float[] data = new float[sampleRate / UPDATES_PER_SECOND];
+            float[] waveform = new float[data.length];
 
-            // TODO ensure sane constant Q performance
-            Log.d(TAG, "Will use FFT of size "
-                    + ConstantQTransform.getFftSize(sampleRate, minFreqBin, freqBinRatio));
-            ConstantQTransform constantQ = new ConstantQTransform(null, sampleRate, minFreqBin,
-                    freqBinRatio, numFreqBins);
-            int numSamples = constantQ.getFftSize();
-
-            float[] data = new float[2 * numSamples];
-
-            float[] waveform = new float[numSamples];
-            int numSamplesPerReferenceCycle = (int) (numSamples / tuningFrequency);
-
-            // Since the number of samples taken will not always be exactly an integer multiple
-            // of the reference frequency, we apply an offset to the sampled wave before adding
-            // it to the reference wave.
-            int referenceWaveformOffset =
-                    numSamplesPerReferenceCycle - (numSamples % numSamplesPerReferenceCycle);
-
-            float[] powerSpectrum = new float[constantQ.getNumCoefficients()];
-
-            waveformFrag.setReferenceFrequency(tuningFrequency);
-            waveformFrag.setData(waveform);
-
-            powerSpectrumFrag.configureSpectrum(constantQ.getRatio(), constantQ.getMinFrequency());
-            powerSpectrumFrag.setData(powerSpectrum);
-
-            PcmFloatReader pcmFloatReader = new PcmFloatReader(audioRecord, numSamples);
-            audioRecord.startRecording();
+            double framesPerDroneCycle = sampleRate / tuningFrequency;
+            int totalCompleteDroneFrames = (int) (data.length / framesPerDroneCycle);
+            int dataWaveOffsetDelta = data.length - totalCompleteDroneFrames;
+            int dataWaveOffset = 0;
+            int droneWaveOffsetDelta = data.length % (int) framesPerDroneCycle;
+            int droneWaveOffset = 0;
 
             publishProgress(0);
 
@@ -343,29 +249,38 @@ public class MainActivity extends RecordAudioActivity<Void, Integer, Void>
                 return null;
             }
 
+            waveformFrag.setReferenceFrequency(tuningFrequency);
+            waveformFrag.setData(waveform);
+
+            PcmFloatReader pcmFloatReader = new PcmFloatReader(audioRecord, data.length);
+            audioRecord.startRecording();
+
             while (!isCancelled()) {
                 try {
                     maybePause();
                 } catch (InterruptedException e) {
                     break;
                 }
-                int n = pcmFloatReader.read(data, 0, numSamples);
+                int n = pcmFloatReader.read(data, 0, data.length);
                 if (n < 0) {
                     Log.e(TAG, "AudioRecord read error " + n);
                     publishProgress(-1);
                     break;
                 }
 
-                double referenceAmplitude = MiscMath.rms(data, 0, numSamples);
-
-                int numReferenceSamples = (int) (numSamplesPerReferenceCycle * tuningFrequency);
-                for (int i = 0; i < numReferenceSamples; i++) {
+                double droneAmplitude = MiscMath.rms(data, 0, data.length);
+                for (int i = 0; i < data.length - dataWaveOffset; i++) {
                     double t = (double) i / sampleRate;
-                    double a = referenceAmplitude * Math.sin(2 * Math.PI * tuningFrequency * t);
-                    waveform[i] = 0.5f * (float) a + 0.5f * data[i + referenceWaveformOffset];
+                    double a = droneAmplitude * Math.sin(tuningFrequency * t);
+                    waveform[i] = 0.5f * (float) a + 0.5f * data[i + dataWaveOffset];
                 }
-
-                constantQ.realConstantQPowerDbFull(data, powerSpectrum, P_0);
+                for (int i = data.length - dataWaveOffset; i < data.length; i++) {
+                    waveform[i] = 0f;
+                }
+                dataWaveOffset += dataWaveOffsetDelta;
+                dataWaveOffset %= framesPerDroneCycle;
+                droneWaveOffset += droneWaveOffsetDelta;
+                droneWaveOffset %= framesPerDroneCycle;
 
                 publishProgress(1);
             }
@@ -380,20 +295,21 @@ public class MainActivity extends RecordAudioActivity<Void, Integer, Void>
 
         @Override
         protected void onProgressUpdate(Integer... values) {
+            if (isCancelled()) {
+                return;
+            }
             switch (values[0]) {
                 case -1:
                     Snackbar.make(findViewById(android.R.id.content),
                             R.string.error_audio_record_failure, Snackbar.LENGTH_INDEFINITE).show();
-                    powerSpectrumFrag.getGraph().clear();
                     waveformFrag.getGraph().clear();
                     return;
 
                 case 0:
-                    crossFade(loadingView, analysisView);
+                    AnimationUtils.crossFade(loadingView, analysisView, shortAnimationDuration);
                     return;
 
                 case 1:
-                    powerSpectrumFrag.notifyDataSetChanged();
                     waveformFrag.notifyDataSetChanged();
                     return;
 

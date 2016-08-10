@@ -26,8 +26,12 @@ import android.view.View;
 import android.view.ViewGroup;
 import com.crcrch.chromatictuner.app.R;
 import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public abstract class GraphFragment extends Fragment {
     private static final String STATE_DATA = "data";
@@ -56,9 +60,9 @@ public abstract class GraphFragment extends Fragment {
         graph.setDescription(graphDescription);
 
         if (savedInstanceState != null) {
-            float[] savedPowerSpectrum = savedInstanceState.getFloatArray(STATE_DATA);
-            if (savedPowerSpectrum != null) {
-                setData(savedPowerSpectrum);
+            float[] savedData = savedInstanceState.getFloatArray(STATE_DATA);
+            if (savedData != null) {
+                setData(savedData);
             }
         }
 
@@ -72,8 +76,7 @@ public abstract class GraphFragment extends Fragment {
     }
 
     /**
-     * Should be called to give this fragment the array that will be subsequently updated with the
-     * power data.
+     * Should be called to give this fragment the array that the caller later fills with data.
      *
      * @param data the array that will be updated when {@link #notifyDataSetChanged()} is
      * called
@@ -88,7 +91,13 @@ public abstract class GraphFragment extends Fragment {
         configureGraph(graph, series);
     }
 
-    protected abstract LineDataSet createLineDataSet(@NonNull float[] data);
+    protected LineDataSet createLineDataSet(@NonNull float[] data) {
+        List<Entry> amplitudes = new ArrayList<>(data.length);
+        for (int i = 0; i < data.length; i++) {
+            amplitudes.add(new FloatArrayEntry(data, i));
+        }
+        return new LineDataSet(amplitudes, null);
+    }
 
     protected abstract void configureGraph(LineChart graph, LineDataSet series);
 

@@ -15,6 +15,11 @@
 
 package com.crcrch.chromatictuner.util;
 
+import android.media.AudioFormat;
+import android.media.AudioRecord;
+import android.os.Build;
+import com.crcrch.chromatictuner.app.AnalysisConfiguration;
+
 public final class MiscMusic {
     public static final String[] CHROMATIC_SCALE = new String[] {
             "C", "C♯/D♭", "D", "E♭/D♯", "E", "F", "F♯/G♭", "G", "A♭/G♯", "A", "B♭/A♯", "B"
@@ -24,4 +29,5 @@ public final class MiscMusic {
     private MiscMusic() {
         throw new AssertionError("MiscMusic should not be instantiated!");
     }
+
 }

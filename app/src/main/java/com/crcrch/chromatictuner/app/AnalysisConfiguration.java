@@ -8,6 +8,7 @@ import android.media.MediaRecorder;
 import android.os.Build;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
+import com.crcrch.chromatictuner.util.MiscMath;
 import com.crcrch.chromatictuner.util.MiscMusic;
 import com.crcrch.chromatictuner.util.SharedPreferencesUtils;
 
@@ -25,7 +26,7 @@ public class AnalysisConfiguration {
     private static final int FALLBACK_SAMPLE_RATE = 44100; // guaranteed to be available
     private static final double DEFAULT_TUNING_FREQUENCY = MiscMusic.A4;
     private static final double DEFAULT_FREQ_BIN_RATIO =
-            Math.pow(2, 1.0 / (MiscMusic.CHROMATIC_SCALE.length));
+            Math.pow(2, 1.0 / MiscMusic.CHROMATIC_SCALE.length);
     private static final int DEFAULT_NUM_FREQUENCY_BINS = 2 * MiscMusic.CHROMATIC_SCALE.length + 1;
 
     private static final int[] UNVERIFIED_SAMPLE_RATES = new int[] {
@@ -93,12 +94,23 @@ public class AnalysisConfiguration {
         return sampleRates;
     }
 
-    public int getBufferSizeToUse(int encoding) {
-        int sampleRateToUse = getPreferredSampleRate();
-        int minBufferSize = AudioRecord.getMinBufferSize(sampleRateToUse, AudioFormat.CHANNEL_IN_DEFAULT, encoding);
-        double fftBinResolution = sampleRateToUse / FREQUENCY_RESOLUTION;
-        int computedBufferSize = (int) (2 * fftBinResolution);
-        return Math.max(2 * minBufferSize, computedBufferSize);
+    public int getAudioBufferSizeForFft(int encoding) {
+        int sampleRateToUse = guessSampleRateToUse();
+        int minBufferSize = AudioRecord.getMinBufferSize(sampleRateToUse,
+                AudioFormat.CHANNEL_IN_DEFAULT, encoding);
+
+        int minFftBufferSize = (int) (sampleRateToUse / FREQUENCY_RESOLUTION);
+        int computedFftBufferSize =
+                minBufferSize * MiscMath.divideRoundingUp(minFftBufferSize, minBufferSize);
+
+        return Math.max(2 * minBufferSize, computedFftBufferSize);
+    }
+
+    public int getAudioBufferSize(int encoding) {
+        int sampleRateToUse = guessSampleRateToUse();
+        int minBufferSize = AudioRecord.getMinBufferSize(sampleRateToUse,
+                AudioFormat.CHANNEL_IN_DEFAULT, encoding);
+        return 2 * minBufferSize;
     }
 
     public double getMaxFrequency() {

@@ -66,15 +66,6 @@ public class PowerSpectrumFragment extends GraphFragment {
     }
 
     @Override
-    protected LineDataSet createLineDataSet(@NonNull float[] data) {
-        List<Entry> magnitudes = new ArrayList<>(data.length);
-        for (int i = 0; i < data.length; i++) {
-            magnitudes.add(new FloatArrayEntry(data, i));
-        }
-        return new LineDataSet(magnitudes, null);
-    }
-
-    @Override
     protected void configureGraph(final LineChart graph, LineDataSet series) {
         series.setDrawCircles(false);
         series.setColor(R.color.app_primary);
@@ -122,7 +113,7 @@ public class PowerSpectrumFragment extends GraphFragment {
 
         @Override
         public int getDecimalDigits() {
-            return 2;
+            return -1;
         }
     }
 }
