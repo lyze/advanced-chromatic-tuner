@@ -17,6 +17,7 @@ package com.crcrch.chromatictuner;
 
 import android.os.Bundle;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -49,13 +50,12 @@ public class PowerSpectrumFragment extends GraphFragment {
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
+    public void onViewStateRestored(@Nullable Bundle savedInstanceState) {
+        super.onViewStateRestored(savedInstanceState);
         if (savedInstanceState != null) {
             r = savedInstanceState.getDouble(STATE_R);
             minFreq = savedInstanceState.getDouble(STATE_MIN_FREQ);
         }
-        return super.onCreateView(inflater, container, savedInstanceState);
     }
 
     @Override

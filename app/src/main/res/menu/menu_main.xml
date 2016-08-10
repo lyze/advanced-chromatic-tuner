@@ -19,9 +19,9 @@
       tools:context=".MainActivity">
 
     <item
-        android:id="@+id/action_analysis_settings"
+        android:id="@+id/action_constant_q"
         android:icon="@drawable/ic_tune_black_24dp"
-        android:title="@string/action_configure_analysis"
+        android:title="@string/action_constant_q_analysis"
         app:showAsAction="ifRoom"/>
 
     <item android:id="@+id/action_app_settings"

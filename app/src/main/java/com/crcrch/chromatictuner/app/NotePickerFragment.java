@@ -27,15 +27,14 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.NumberPicker;
 import android.widget.TextView;
+import com.crcrch.chromatictuner.util.MiscMusic;
 
 public class NotePickerFragment extends DialogFragment {
+    private static final String TAG = "NotePickerFragment";
     private static final int MAX_OCTAVE = 8;
-    private static final String[] CHROMATIC_SCALE = new String[] {
-            "C", "C♯/D♭", "D", "E♭/D♯", "E", "F", "F♯/G♭", "G", "A♭/G♯", "A", "B♭/A♯", "B"};
     private static final String ARG_INITIAL_FREQ = "initialFreq";
     private static final String STATE_FREQUENCY = "frequency";
-    private static final double INITIAL_FREQUENCY_FALLBACK = 440;
-    private static final String TAG = "NotePickerFragment";
+    private static final double FALLBACK_INITIAL_FREQUENCY = 440;
 
     private OnFrequencySelectedListener listener;
 
@@ -59,15 +58,15 @@ public class NotePickerFragment extends DialogFragment {
     }
 
     private static int getNoteForFrequency(double f) {
-        return (int) (CHROMATIC_SCALE.length * Math.log(f / 440) / Math.log(2)) + 57;
+        return (int) (MiscMusic.CHROMATIC_SCALE.length * Math.log(f / 440) / Math.log(2)) + 57;
     }
 
     private static int getOctaveForNote(int note) {
-        return note / CHROMATIC_SCALE.length;
+        return note / MiscMusic.CHROMATIC_SCALE.length;
     }
 
     private static double getFrequencyForNote(int note) {
-        return Math.pow(2, (note - 57.0) / CHROMATIC_SCALE.length) * 440;
+        return Math.pow(2, (note - 57.0) / MiscMusic.CHROMATIC_SCALE.length) * 440;
     }
 
     private static int getOctaveForFrequency(double f) {
@@ -75,11 +74,11 @@ public class NotePickerFragment extends DialogFragment {
     }
 
     private static double getFrequencyForNoteIndexAndOctave(int i, int octave) {
-        return getFrequencyForNote(octave * CHROMATIC_SCALE.length + i);
+        return getFrequencyForNote(octave * MiscMusic.CHROMATIC_SCALE.length + i);
     }
 
     private static int getNoteIndexForNote(int note) {
-        return note % CHROMATIC_SCALE.length;
+        return note % MiscMusic.CHROMATIC_SCALE.length;
     }
 
     @Override
@@ -90,7 +89,7 @@ public class NotePickerFragment extends DialogFragment {
         }
         if (initialFrequency <= 0) {
             Log.w(TAG, "Invalid initial frequency: " + initialFrequency);
-            initialFrequency = INITIAL_FREQUENCY_FALLBACK;
+            initialFrequency = FALLBACK_INITIAL_FREQUENCY;
         }
     }
 
@@ -114,11 +113,12 @@ public class NotePickerFragment extends DialogFragment {
 
         final NumberPicker notePicker = (NumberPicker) dialogContent.findViewById(R.id.picker_note);
         notePicker.setMinValue(0);
-        notePicker.setMaxValue(CHROMATIC_SCALE.length - 1);
-        notePicker.setDisplayedValues(CHROMATIC_SCALE);
+        notePicker.setMaxValue(MiscMusic.CHROMATIC_SCALE.length - 1);
+        notePicker.setDisplayedValues(MiscMusic.CHROMATIC_SCALE);
         notePicker.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
 
-        final NumberPicker octavePicker = (NumberPicker) dialogContent.findViewById(R.id.picker_octave);
+        final NumberPicker octavePicker = (NumberPicker) dialogContent.findViewById(R.id
+                .picker_octave);
         octavePicker.setMinValue(0);
         octavePicker.setMaxValue(MAX_OCTAVE);
         octavePicker.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);

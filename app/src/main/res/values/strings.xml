@@ -33,8 +33,10 @@
     <string name="hz">Hz</string>
     <string name="error_frequency_exceeded_maximum">exceeds the maximum measurable frequency of %.2f Hz</string>
     <string name="error_not_positive_decimal">not a positive decimal number</string>
-    <string name="action_configure_analysis">Configure analysis</string>
-    <string name="main_activity_name">Chromatic Analyzer</string>
+    <string name="action_constant_q_analysis">Configure analysis</string>
+    <string name="title_activity_main">Chromatic Analyzer</string>
     <string name="description_music_note">music note</string>
     <string name="dialog_title_note_picker">Pitch selection</string>
+    <string name="error_audio_record_failure">A problem occurred while capturing audio.</string>
+    <string name="title_activity_constant_q">Constant Q Spectrum</string>
 </resources>

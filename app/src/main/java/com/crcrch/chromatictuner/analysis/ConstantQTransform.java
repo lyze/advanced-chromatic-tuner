@@ -57,6 +57,19 @@ public class ConstantQTransform {
      */
     public ConstantQTransform(@Nullable WindowFunction window,
                               double sampleRate, double minFreq, double r, int numConstantQBins) {
+        if (sampleRate <= 0) {
+            throw new IllegalArgumentException("non-positive sample rate: " + sampleRate);
+        }
+        if (minFreq <= 0) {
+            throw new IllegalArgumentException("non-positive frequency: " + minFreq);
+        }
+        if (r <= 1) {
+            throw new IllegalArgumentException("ratio must be r" + r);
+        }
+        if (numConstantQBins <= 0) {
+            throw new IllegalArgumentException(
+                    "non-positive number of coefficients: " + numConstantQBins);
+        }
         this.ratio = r;
         minFrequency = minFreq;
 
@@ -90,10 +103,8 @@ public class ConstantQTransform {
         }
     }
 
-    public static ConstantQTransform new12TetConstantQTransform(
-            @Nullable WindowFunction window, double sampleRate, double minFreq, int numSemitones) {
-        return new ConstantQTransform(window, sampleRate, minFreq, Math.pow(2,
-                1.0 / 12), numSemitones);
+    public static int getFftSize(double sampleRate, double minFreq, double ratio) {
+        return (int) (sampleRate / getResolution(minFreq, ratio));
     }
 
     public static double getResolution(double minFreq, double ratio) {
@@ -109,7 +120,7 @@ public class ConstantQTransform {
         CommonUtils.scale(numSamples, 1.0f / numSamples, a, 0, false);
     }
 
-    public int getNumSamples() {
+    public int getFftSize() {
         return numSamples;
     }
 
@@ -121,7 +132,7 @@ public class ConstantQTransform {
      * Computes a power spectrum of a constant Q transform on real data.
      *
      * @param input an array of size exactly {@code 2n} with the first {@code n} elements filled
-     * with the real data points, where {@code n} equals the value of {@link #getNumSamples()}
+     * with the real data points, where {@code n} equals the value of {@link #getFftSize()}
      * @param output the output array of size exactly {@link #getNumCoefficients()}.
      * @param p0 the reference power level
      */
